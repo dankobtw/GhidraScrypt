@@ -14,7 +14,7 @@ A Ghidra Python (Jython) script that automates decrypting XOR-obfuscated strings
 
 ## Installation
 
-1. Copy `#_Ghidra_Python_Script_XOR_String_Deobfuscation_&_Annotator.py` into your Ghidra scripts folder (`Window → Script Manager → Script Directories`, or the default `~/ghidra_scripts`).
+1. Copy `xor_deobfuscator.py` into your Ghidra scripts folder (`Window → Script Manager → Script Directories`, or the default `~/ghidra_scripts`).
 2. Refresh the script list in the Script Manager (refresh icon) — the script shows up under the `MalwareAnalysis.Deobfuscation` category.
 
 ## Usage

@@ -2,35 +2,35 @@
 # @category MalwareAnalysis.Deobfuscation
 # @author Malware Analyst
 #
-# Что умеет:
-#  - расшифровка XOR (однобайтовый или многобайтовый ключ)
-#  - автоподбор однобайтового ключа перебором, если он неизвестен
-#  - декодирование ASCII или UTF-16LE
-#  - Plate/EOL комментарии, метка и bookmark на найденной строке
-#  - не падает на плохом адресе - пропускает и идёт дальше
+# Features:
+#  - XOR decryption (single-byte or multi-byte key)
+#  - single-byte key brute-force auto-detection, if unknown
+#  - ASCII or UTF-16LE decoding
+#  - Plate/EOL comments, a label, and a bookmark on the found string
+#  - doesn't crash on a bad address - skips it and moves on
 
 from ghidra.program.model.symbol import SourceType
 from ghidra.program.model.mem import MemoryAccessException
 
 # ==============================================================================
-# НАСТРОЙКИ
+# SETTINGS
 # ==============================================================================
-# Ключ XOR: однобайтовый [0x5A] или многобайтовый [0xDE, 0xAD, 0xBE, 0xEF].
-# Игнорируется, если AUTO_DETECT_KEY = True.
+# XOR key: single-byte [0x5A] or multi-byte [0xDE, 0xAD, 0xBE, 0xEF].
+# Ignored if AUTO_DETECT_KEY = True.
 XOR_KEY = [0x5A]
 
-# Подбирать однобайтовый ключ перебором (256 вариантов), а не брать его из XOR_KEY.
-# Работает только для однобайтовых ключей - для многобайтовых нужен другой подход.
+# Brute-force a single-byte key (256 options) instead of taking it from XOR_KEY.
+# Only works for single-byte keys - multi-byte keys need a different approach.
 AUTO_DETECT_KEY = False
 
-# Кодировка расшифрованных данных: "ascii" или "utf16le"
+# Encoding of the decrypted data: "ascii" or "utf16le"
 ENCODING = "ascii"
 
-# Создавать Bookmark на найденной строке (видно в окне Bookmarks для быстрой навигации)
+# Create a Bookmark on the found string (visible in the Bookmarks window for quick navigation)
 ADD_BOOKMARKS = True
 
-# Задайте адреса вручную, если НЕ используете выделение мышкой в UI.
-# Формат: (0xАДРЕС, ДЛИНА_В_БАЙТАХ)
+# Set addresses manually if you're NOT using mouse selection in the UI.
+# Format: (0xADDRESS, LENGTH_IN_BYTES)
 TARGET_ADDRESSES = [
     # (0x00401050, 32),
     # (0x00401090, 16),
@@ -39,7 +39,7 @@ TARGET_ADDRESSES = [
 
 
 def xor_decrypt(data, key):
-    """Дешифровка байт с использованием циклического XOR-ключа."""
+    """Decrypts bytes using a cyclic XOR key."""
     decrypted = bytearray()
     for i, b in enumerate(data):
         k = key[i % len(key)]
@@ -48,7 +48,7 @@ def xor_decrypt(data, key):
 
 
 def decode_string(data, encoding):
-    """Декодирует буфер до первого null-байта/null-символа. ascii или utf16le."""
+    """Decodes a buffer up to the first null byte/char. ascii or utf16le."""
     chars = []
     if encoding == "utf16le":
         i = 0
@@ -67,7 +67,7 @@ def decode_string(data, encoding):
 
 
 def score_printable(data):
-    """Доля печатных ASCII-байт (0.0-1.0) - используется для подбора ключа."""
+    """Fraction of printable ASCII bytes (0.0-1.0) - used for key guessing."""
     if not data:
         return 0.0
     printable = sum(1 for b in data if 32 <= b <= 126)
@@ -76,8 +76,8 @@ def score_printable(data):
 
 def guess_single_byte_key(data):
     """
-    Перебор всех 256 однобайтовых ключей, выбор по максимальной доле печатных символов.
-    Эвристика: на коротких буферах (< ~8 байт) может ошибиться - стоит перепроверить глазами.
+    Brute-forces all 256 single-byte keys, picks the one with the highest printable-char ratio.
+    Heuristic: can be wrong on short buffers (< ~8 bytes) - worth double-checking manually.
     """
     best_key, best_score = 0, -1.0
     for k in range(256):
@@ -88,20 +88,20 @@ def guess_single_byte_key(data):
 
 
 def safe_read_bytes(start_addr, length):
-    """Читает байты из памяти, бросая понятную ошибку вместо тихой порчи данных."""
+    """Reads bytes from memory, raising a clear error instead of silently corrupting data."""
     buf = bytearray(length)
     try:
         read_count = getBytes(start_addr, buf)
     except MemoryAccessException as e:
-        raise MemoryAccessException("не удалось прочитать {} байт: {}".format(length, str(e)))
+        raise MemoryAccessException("failed to read {} bytes: {}".format(length, str(e)))
     if isinstance(read_count, int) and read_count < length:
-        print("[!] {}: запрошено {} байт, реально прочитано {} (граница региона?)".format(
+        print("[!] {}: requested {} bytes, actually read {} (region boundary?)".format(
             start_addr, length, read_count))
     return buf
 
 
 def make_unique_label(text, addr):
-    """Имя метки включает адрес, чтобы не конфликтовать с другими адресами."""
+    """Label name includes the address to avoid conflicts with other addresses."""
     clean = "".join(c for c in text[:16] if c.isalnum() or c == '_')
     if not clean:
         return None
@@ -109,17 +109,17 @@ def make_unique_label(text, addr):
 
 
 def process_memory_range(start_addr, length):
-    """Чтение, расшифровка и аннотирование участка памяти. Не бросает исключений наружу."""
+    """Reads, decrypts, and annotates a memory range. Never raises exceptions outward."""
     try:
         buf = safe_read_bytes(start_addr, length)
     except MemoryAccessException as e:
-        print("[-] Пропуск {}: {}".format(start_addr, str(e)))
+        print("[-] Skipping {}: {}".format(start_addr, str(e)))
         return
 
     if AUTO_DETECT_KEY:
         guessed, score = guess_single_byte_key(buf)
         key = [guessed]
-        print("[?] {}: подобран ключ 0x{:02X} (score={:.2f})".format(start_addr, guessed, score))
+        print("[?] {}: guessed key 0x{:02X} (score={:.2f})".format(start_addr, guessed, score))
     else:
         key = XOR_KEY
 
@@ -145,24 +145,24 @@ def process_memory_range(start_addr, length):
         try:
             createLabel(start_addr, label_name, True, SourceType.USER_DEFINED)
         except Exception as e:
-            print("[!] Метка '{}' не создана: {}".format(label_name, str(e)))
+            print("[!] Label '{}' not created: {}".format(label_name, str(e)))
 
     if ADD_BOOKMARKS:
         try:
             createBookmark(start_addr, "XOR Deobfuscation", text[:80])
         except Exception as e:
-            print("[!] Bookmark не создан по адресу {}: {}".format(start_addr, str(e)))
+            print("[!] Bookmark not created at address {}: {}".format(start_addr, str(e)))
 
     print("[+] [{}] -> {}".format(start_addr, text))
 
 
 def get_key_interactively():
-    """Запрашивает XOR-ключ у пользователя, если он не задан и автоподбор выключен."""
-    key_str = askString("XOR Key", "Введите байты ключа через пробел (пример: 5A или DE AD BE EF):")
+    """Asks the user for the XOR key if it isn't set and auto-detection is off."""
+    key_str = askString("XOR Key", "Enter key bytes separated by spaces (example: 5A or DE AD BE EF):")
     try:
         return [int(part, 16) for part in key_str.replace(",", " ").split()]
     except ValueError:
-        print("[-] Не удалось разобрать '{}'. Использую 0x00.".format(key_str))
+        print("[-] Could not parse '{}'. Using 0x00.".format(key_str))
         return [0x00]
 
 
@@ -171,24 +171,24 @@ def main():
     if not AUTO_DETECT_KEY and not XOR_KEY:
         XOR_KEY = get_key_interactively()
 
-    # Режим 1: выделение в окне Listing
+    # Mode 1: selection in the Listing window
     if currentSelection is not None and not currentSelection.isEmpty():
         for address_range in currentSelection:
             process_memory_range(address_range.getMinAddress(), address_range.getLength())
         return
 
-    # Режим 2: список TARGET_ADDRESSES
+    # Mode 2: TARGET_ADDRESSES list
     if TARGET_ADDRESSES:
         for addr_hex, length in TARGET_ADDRESSES:
             process_memory_range(toAddr(addr_hex), length)
         return
 
-    # Режим 3: интерактивный запрос адреса, если ничего не задано
-    addr_str = askString("Адрес", "Выделение пустое, TARGET_ADDRESSES не заполнен.\nВведите адрес в hex:")
+    # Mode 3: interactive address prompt if nothing else is set
+    addr_str = askString("Address", "Selection is empty, TARGET_ADDRESSES is not filled.\nEnter address in hex:")
     if not addr_str.strip():
-        print("[-] Отменено пользователем.")
+        print("[-] Cancelled by user.")
         return
-    length = askInt("Длина", "Сколько байт прочитать по адресу {}?".format(addr_str))
+    length = askInt("Length", "How many bytes to read at address {}?".format(addr_str))
     process_memory_range(toAddr(addr_str), length)
 
 

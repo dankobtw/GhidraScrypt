@@ -14,7 +14,7 @@
 
 ## Установка
 
-1. Скопировать `#_Ghidra_Python_Script_XOR_String_Deobfuscation_&_Annotator.py` в папку скриптов Ghidra (`Window → Script Manager → Script Directories`, или дефолтная `~/ghidra_scripts`).
+1. Скопировать `xor_deobfuscator.py` в папку скриптов Ghidra (`Window → Script Manager → Script Directories`, или дефолтная `~/ghidra_scripts`).
 2. Обновить список скриптов в Script Manager (иконка refresh), скрипт появится в категории `MalwareAnalysis.Deobfuscation`.
 
 ## Использование
